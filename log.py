@@ -1,8 +1,7 @@
 import logging
-import time
 import os
 import socket
-from multiprocessing import Process, Lock
+import time
 
 
 def set_up_log(args, sys_argv):
@@ -12,7 +11,7 @@ def set_up_log(args, sys_argv):
         os.mkdir(log_dir)
     if not os.path.exists(dataset_log_dir):
         os.mkdir(dataset_log_dir)
-    file_path = os.path.join(dataset_log_dir, '{}.log'.format(str(time.time())))
+    file_path = os.path.join(dataset_log_dir, f"{str(time.time())}.log")
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
@@ -33,7 +32,7 @@ def set_up_log(args, sys_argv):
     return logger
 
 
-def save_performance_result(args, logger, metrics):
+def save_performance_result(args, logger, metrics, repeat=0):
     summary_file = args.summary_file
     if summary_file != 'test':
         summary_file = os.path.join(args.log_dir, summary_file)
@@ -41,15 +40,15 @@ def save_performance_result(args, logger, metrics):
         return
     dataset = args.dataset
     val_metric, no_val_metric = metrics
-    model_name = '-'.join([args.model, args.feature, str(args.prop_depth)])
+    model_name = '-'.join([args.model, args.de_feature, str(args.prop_depth)])
     seed = args.seed
     log_name = os.path.split(logger.handlers[1].baseFilename)[-1]
     server = socket.gethostname()
-    line = '\t'.join([dataset, model_name, str(seed), str(round(val_metric, 4)), str(round(no_val_metric, 4)), log_name, server]) + '\n'
-    with open(summary_file, 'a') as f:
-        f.write(line)  # WARNING: process unsafe!
-
-
-
-
-
+    line = '\t'.join(
+        [dataset, model_name, str(seed), str(round(val_metric, 4)), f'R{repeat}', str(round(no_val_metric, 4)),
+         log_name, server]) + '\n'
+    try:
+        with open(summary_file, 'a') as f:
+            f.write(line)
+    except:
+        raise Warning(f'Unable to write back summary file at {summary_file}.')

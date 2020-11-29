@@ -1,22 +1,23 @@
-'''
+"""
 Adapted from https://github.com/weihua916/powerful-gnns
-'''
+"""
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-###MLP with lienar output
+# MLP with linear output
 class MLP(nn.Module):
     def __init__(self, num_layers, input_dim, hidden_dim, output_dim):
-        '''
-            num_layers: number of layers in the neural networks (EXCLUDING the input layer). If num_layers=1, this reduces to linear model.
+        """
+            num_layers: number of layers in the neural networks (EXCLUDING the input layer).
+                        If num_layers=1, this reduces to linear model.
             input_dim: dimensionality of input features
             hidden_dim: dimensionality of hidden units at ALL layers
             output_dim: number of classes for prediction
             device: which device to use
-        '''
+        """
 
         super(MLP, self).__init__()
 
@@ -52,3 +53,15 @@ class MLP(nn.Module):
             for layer in range(self.num_layers - 1):
                 h = F.relu(self.batch_norms[layer](self.linears[layer](h)))
             return self.linears[self.num_layers - 1](h)
+
+    def reset_parameters(self):
+        # reset parameters for retraining
+        if self.num_layers == 1:
+            self.linear.reset_parameters()
+        else:
+            # rest linear layers
+            for linear in self.linears:
+                linear.reset_parameters()
+            # rest normalization layers
+            for norm in self.batch_norms:
+                norm.reset_parameters()
