@@ -50,41 +50,104 @@ def read_features(path, node_id_mapping):
 def read_file(args, logger):
     dataset = args.dataset
     di_flag = args.directed
-    if dataset in ['brazil-airports', 'europe-airports', 'usa-airports', 'foodweb', 'karate', 'chameleon', 'film',
-                   'squirrel', 'cornell', 'texas', 'wisconsin', 'cora', 'citeseer', 'pubmed']:
+    if dataset in ['brazil-airports', 'europe-airports', 'usa-airports', 'foodweb', 'karate', 'chameleon', 'Actor',
+                   'Squirrel', 'cornell', 'texas', 'wisconsin', 'cora', 'citeseer', 'pubmed']:
         task = 'node_classification'
     else:
         raise ValueError('dataset not found')
 
     directory = f'./data/{task}/{dataset}/'
-    labels, node_id_mapping = read_label(directory)
-    edges = read_edges(directory, node_id_mapping)
+    if dataset in ['Actor', 'Squirrel']:
+        graph_adjacency_list_file_path = directory + 'out1_graph_edges.txt'
+        graph_node_features_and_labels_file_path = directory + 'out1_node_feature_label.txt'
 
-    # load dataset and save as type of nx.Graph
-    if not di_flag:
-        G = nx.Graph(edges)
-    else:
-        G = nx.DiGraph(edges)
-    attributes = np.zeros((G.number_of_nodes(), 1), dtype=np.float32)
+        # read node features and labels
+        node_features = []
+        labels = []
+        node_id_mapping = {}
+        with open(graph_node_features_and_labels_file_path) as graph_node_features_and_labels_file:
+            graph_node_features_and_labels_file.readline()
+            for new_id, line in enumerate(graph_node_features_and_labels_file):
+                line = line.rstrip().split('\t')
+                old_id = line[0]
+                assert (len(line) == 3)
+                assert (old_id not in node_id_mapping.keys())
+                node_id_mapping[old_id] = new_id
+                if dataset == 'Actor':
+                    node_feature = np.zeros(932, dtype=np.uint8)
+                    node_feature[np.array(line[1].split(','), dtype=np.uint16)] = 1
+                else:
+                    node_feature = np.array(line[1].split(','), dtype=np.uint8)
 
-    # degree features
-    if not args.no_degree:
-        attributes += np.expand_dims(np.log(get_degrees(G) + 1), 1).astype(np.float32)
+                node_features.append(node_feature)
+                label = int(line[2])
+                labels.append(label)
 
-    # node raw features
-    if args.use_raw != 'None':
-        node_features = read_features(directory, node_id_mapping)
-        if args.use_raw == 'init':
-            if not args.no_degree:
-                attributes = np.concatenate([attributes, node_features], axis=1)
-            else:
-                attributes = node_features
-        elif args.use_raw == 'concat':
-            node_features = torch.tensor(node_features, dtype=torch.float32)
+            node_features = np.stack(node_features, axis=0)
+
+        # read edges
+        edges = []
+        with open(graph_adjacency_list_file_path) as graph_adjacency_list_file:
+            graph_adjacency_list_file.readline()
+            for line in graph_adjacency_list_file:
+                line = line.rstrip().split('\t')
+                assert (len(line) == 2)
+                edges.append([node_id_mapping[line[0]], node_id_mapping[line[1]]])
+
+        # load dataset and save as type of nx.Graph
+        if not di_flag:
+            G = nx.Graph(edges)
         else:
-            raise NotImplementedError
+            G = nx.DiGraph(edges)
+        attributes = np.zeros((G.number_of_nodes(), 1), dtype=np.float32)
+
+        # degree features
+        if not args.no_degree:
+            attributes += np.expand_dims(np.log(get_degrees(G) + 1), 1).astype(np.float32)
+
+        # node raw features
+        if args.use_raw != 'None':
+            if args.use_raw == 'init':
+                if not args.no_degree:
+                    attributes = np.concatenate([attributes, node_features], axis=1)
+                else:
+                    attributes = node_features
+            elif args.use_raw == 'concat':
+                node_features = torch.tensor(node_features, dtype=torch.float32)
+            else:
+                raise NotImplementedError
+        else:
+            node_features = None
+
     else:
-        node_features = None
+        labels, node_id_mapping = read_label(directory)
+        edges = read_edges(directory, node_id_mapping)
+
+        # load dataset and save as type of nx.Graph
+        if not di_flag:
+            G = nx.Graph(edges)
+        else:
+            G = nx.DiGraph(edges)
+        attributes = np.zeros((G.number_of_nodes(), 1), dtype=np.float32)
+
+        # degree features
+        if not args.no_degree:
+            attributes += np.expand_dims(np.log(get_degrees(G) + 1), 1).astype(np.float32)
+
+        # node raw features
+        if args.use_raw != 'None':
+            node_features = read_features(directory, node_id_mapping)
+            if args.use_raw == 'init':
+                if not args.no_degree:
+                    attributes = np.concatenate([attributes, node_features], axis=1)
+                else:
+                    attributes = node_features
+            elif args.use_raw == 'concat':
+                node_features = torch.tensor(node_features, dtype=torch.float32)
+            else:
+                raise NotImplementedError
+        else:
+            node_features = None
 
     G.graph['attributes'] = attributes
     logger.info(
