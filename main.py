@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--hidden_dim', type=int, default=32, help='hidden dimension')
     parser.add_argument('--data_usage', type=float, default=1.0, help='use partial dataset')
     parser.add_argument('--test_ratio', type=float, default=0.2, help='ratio of the test / valid against whole')
+    parser.add_argument('--splits_file_path', help="Please give a splits file path")
     parser.add_argument('--metric', type=str, default='acc', help='metric for evaluating performance',
                         choices=['acc', 'auc'])
     parser.add_argument('--seed', type=int, default=0, help='seed to initialize all the random modules')
@@ -77,7 +78,8 @@ def main():
         dic_res = []
         for r in range(args.repeat):
             # randomly split dataset and construct dataloaders
-            data = gen_dataloader(datalist, test_ratio=args.test_ratio, bs=args.bs, logger=logger, labels=labels)
+            data = gen_dataloader(datalist, test_ratio=args.test_ratio, bs=args.bs, logger=logger, labels=labels,
+                                  splits_file_path = args.splits_file_path)
             results = train_model(model, data, args, logger, repeat=r)
             dic_res.append([results[0] * 100, results[1] * 100])
             save_performance_result(args, logger, results, repeat=r)

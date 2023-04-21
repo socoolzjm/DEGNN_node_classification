@@ -280,18 +280,31 @@ def gen_rw_features(adj, root, rw_depth):
     return features_rw.astype(np.float32)
 
 
-def gen_dataloader(datalist, test_ratio, bs, logger, labels=None):
+def gen_dataloader(datalist, test_ratio, bs, logger, labels=None, splits_file_path = None):
     n_samples = len(datalist)
 
-    train_indices, val_test_indices = split_dataset(list(range(n_samples)), test_ratio=2 * test_ratio, stratify=labels)
+    if splits_file_path:
+        print('Using fixed split')
+        with np.load(splits_file_path) as splits_file:
+            train_mask = splits_file['train_mask']
+            val_mask = splits_file['val_mask']
+            test_mask = splits_file['test_mask']
+            val_index = np.where(val_mask == 1)[0]
+            test_index = np.where(test_mask == 1)[0]
+            val_ratio = len(val_index) / n_samples
+            test_ratio = len(test_index) / n_samples
 
-    val_test_labels = np.array(labels)[val_test_indices]
-    val_indices, test_indices = split_dataset(val_test_indices, test_ratio=int(0.5 * len(val_test_indices)),
-                                              stratify=val_test_labels)
+    else:
+        val_ratio = test_ratio
+        train_indices, val_test_indices = split_dataset(list(range(n_samples)), test_ratio=2 * test_ratio, stratify=labels)
 
-    train_mask = get_mask(train_indices, n_samples)
-    val_mask = get_mask(val_indices, n_samples)
-    test_mask = get_mask(test_indices, n_samples)
+        val_test_labels = np.array(labels)[val_test_indices]
+        val_indices, test_indices = split_dataset(val_test_indices, test_ratio=int(0.5 * len(val_test_indices)),
+                                                  stratify=val_test_labels)
+
+        train_mask = get_mask(train_indices, n_samples)
+        val_mask = get_mask(val_indices, n_samples)
+        test_mask = get_mask(test_indices, n_samples)
 
     assert sum(train_mask) + sum(val_mask) + sum(test_mask) == n_samples
 
@@ -302,7 +315,7 @@ def gen_dataloader(datalist, test_ratio, bs, logger, labels=None):
     train_loader, val_loader, test_loader = load_datasets(train_set, val_set, test_set, bs)
 
     logger.info(f'Train size :{len(train_set)}, val size: {len(val_set)}, test size: {len(test_set)}, '
-                f'val ratio: {test_ratio}, test ratio: {test_ratio}')
+                f'val ratio: {val_ratio}, test ratio: {test_ratio}')
 
     # return {'train': train_loader, 'val': val_loader, 'test': test_loader}
     return train_loader, val_loader, test_loader
